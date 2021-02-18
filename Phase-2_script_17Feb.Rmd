@@ -28,6 +28,7 @@ library(mediation)
 library(broom)
 library(broom.mixed)
 library(lme4)
+library(boot)
 ```
 
 ```{r load-dataset}
@@ -218,9 +219,7 @@ df_couples_3 <- df_couples %>%
 ## Step-1: Effect of more daughters (Exposure) on Contraception Use (Outcome)
 ```{r Step-1,echo=TRUE}
 
-model_1a <- glmer(any_modern ~ more_daughters + w_edu_yrs + m_edu_yrs + w_age + m_age + 
-                  islam + std_wealth_index + urban + num_child + (1 | v001), data = df_couples_2, family = binomial("logit"))
-
+model_1a <- glmer(any_modern ~ more_daughters + num_child + (1 | v001), data = df_couples_2, family = binomial("logit"))
 tidy(model_1a, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
 
 ```
@@ -228,7 +227,7 @@ tidy(model_1a, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
 ## Step-2: Effect of more girls (Exposure) on Concordance between partners (mediator)
 
 ```{r Step-2, echo=TRUE}
-model_1b <- glmer(both_want ~ more_daughters + (1 | v001), data = df_couples_2, family = "poisson")
+model_1b <- glmer(both_want ~ more_daughters + (1 | v001), data = df_couples_2, family = binomial("logit"))
 tidy(model_1b, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
 ```
 
@@ -238,6 +237,34 @@ tidy(model_1b, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
 model_1c <- glmer(any_modern ~ both_want + more_daughters + w_edu_yrs + m_edu_yrs + w_age + m_age + 
                   islam + std_wealth_index + urban + num_child + (1 | v001), data = df_couples_2, family = binomial("logit"))
 tidy(model_1c, exponentiate = F, conf.int = T)[(1:3), c(3:4,8:9)]
+```
+
+## Calculate NDE and NIE
+
+```{r}
+## Estimates
+(model_1_NDE <- coef(summary(model_1c))[3,1])
+(model_1_NIE <- coef(summary(model_1b))[2,1] * coef(summary(model_1c))[2,1]) 
+
+## Confidence Intervals for NDE
+
+#(model_1_NDE_ci <- confint(model_1c, parm = "more_daughtersMore daughters than sons", level = 0.95))
+
+## Confidence Intervals for NDE
+# Function to generate NIE
+
+foo <- function(model_med, model_outcome, mediator, exposure) {
+  model_nie <- coef(summary(model_1b))[2,1] * coef(summary(model_1c))[mediator,1]
+  return(model_nie)
+}
+
+# bootstrap's bootstraps
+set.seed(0112358)
+library(boot)
+boot_nie <- boot(df_couples_2, foo, R = 1000)
+boot.ci(boot.out = boot_nie, type = c("basic"))
+
+
 ```
 
 
@@ -252,8 +279,7 @@ summary(model_1_med)
 ## Step-1: Effect of more daughters (Exposure) on Contraception Use (Outcome)
 ```{r More than 2 children: step-1, echo=TRUE}
 
-model_2a <- glmer(any_modern ~ more_daughters + w_edu_yrs + m_edu_yrs + w_age + m_age + 
-                  islam + std_wealth_index + urban + num_child + (1 | v001), data = df_couples_3, family = binomial("logit"))
+model_2a <- glmer(any_modern ~ more_daughters + num_child + (1 | v001), data = df_couples_3, family = binomial("logit"))
 
 tidy(model_2a, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
 
