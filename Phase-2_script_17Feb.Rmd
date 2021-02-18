@@ -1,0 +1,291 @@
+---
+title: 'FMPH 291 Reproducibility: Assignment 2'
+author: "Arnab Dey, Michael Cheung"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  slidy_presentation:
+    highlight: tango
+    slide_level: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\n \\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+
+```{r load-packages, include=FALSE}
+library(haven)
+library(tidyverse)
+library(summarytools)
+library(compareGroups)
+library(mediation)
+library(broom)
+library(broom.mixed)
+library(lme4)
+```
+
+```{r load-dataset}
+
+varlist_couples <- c("v001", "v020", "v021", "v024", "v312", "v025", "v012", "mv012", 
+                     "v130", "v133", "mv133", "v205", "sm224", "s309",
+                      "v202", "v203", "v204", "v205", "v191", "v602", "mv602",
+                     "v614", "mv614")
+
+df_master <- read_dta("C:/Users/arnab/OneDrive/Desktop/Analyses/Datasets/NFHS-4/Data/Couples Recode/IACR74DT/IACR74FL.dta", 
+                      col_select = all_of(varlist_couples))
+df_master <- as_factor(df_master)
+```
+
+```{r dataset for analysis, include=FALSE}
+## All couples
+df_couples <- df_master %>% 
+  mutate(total_child = v202 + v203 + v204 + v205) %>% 
+  filter(total_child != 0)
+```
+
+## Motivation for analysis
+
+- Sex composition of children is known to reduce contraceptive use in India
+- We want to understand if couple's desire for more children mediates the association 
+
+## Dataset Used
+
+- Demographic Health Survey - India conducted in 2015-16
+- Couple's dataset where responses from both the male and the female partner are captured
+- Total 63,696 cases of which 57,790 couples had at least 1 child
+- We used the 57,790 cases for our analysis
+
+## Key variables
+
+* Outcome variable: Current use of any modern method of family planning by the couple (0/1)
+* Exposure variable: Couples that have more girls than boys 
+* Mediator: Couple's who are concordant in their desire for more children
+
+
+## Methods
+
+* We used Baron and Kenny's (1986) four step approach to understand the mediation effect
+* Step-1 involved regressing the Exposure on the Outcome, adjusting for confounders
+* Step-2 involved regressing the Exposure on the mediator
+* Step-3 involved regressing the Mediator on the Outcome, adjusting for the exposure and other covariates
+* We stratified the analysis by Total number of living children (less than 3 vs. 3 or more) 
+* We also used the Mediation package in R to calculate the bootstrapped CIs (500 sims) around the ACME 
+
+
+## Outcome of interest: Use of any modern contraceptive method by the couple
+
+```{r create dependent variable for the analysis, echo = FALSE}
+
+df_couples$any_modern <- with(df_couples, ifelse((v312 == "not using" | v312 == "rhythm/periodic abstinence" | 
+                                               v312 == "withdrawal" | v312 == "lactational amenorrhea (lam)" | 
+                                               v312 == "standard days"), 0, 1)) 
+
+df_couples$any_modern <- with(df_couples, factor(any_modern, levels = c(0,1), labels = c("No or traditional methods", "Any modern method")))
+
+
+df_couples %>% 
+  group_by(any_modern) %>% 
+  summarize(n = n()) %>% 
+  mutate(pct = round(n/sum(n)*100, 2)) %>% 
+  ggplot(aes(x = any_modern, y = pct)) +
+  geom_col(fill = "#7a6374") + 
+  geom_text(aes(label = pct), vjust = -0.5) +
+  expand_limits(y = c(0,100)) +
+  ylab("Percentage") +
+  xlab("") + 
+  theme_minimal()
+```
+
+## Exposure of interest: Couple's with more daughters than sons
+
+```{r create the exposure variable, echo = FALSE}
+
+df_couples <- df_couples %>% 
+  mutate(more_daughters = ifelse(((v202 + v204) < (v203 + v205)), "More daughters than sons", "Less or equal no. of sons")) %>% 
+  mutate(more_daughters = as.factor(more_daughters))
+
+df_couples %>% 
+  group_by(more_daughters) %>% 
+  summarize(n = n()) %>% 
+  mutate(pct = round(n/sum(n)*100, 2)) %>% 
+  ggplot(aes(x = more_daughters, y = pct)) +
+  geom_col(fill = "#7a6374") + 
+  geom_text(aes(label = pct), vjust = -0.5) +
+  expand_limits(y = c(0,100)) +
+  ylab("Percentage") +
+  xlab("") + 
+  theme_minimal()
+
+```
+
+## Mediator variable: Couple's desire for more children
+
+```{r create the mediator variable, echo = FALSE}
+df_couples <- df_couples %>% 
+  mutate(w_want_more = ifelse(as.numeric(v614) > total_child, 1, 0)) %>% 
+  mutate(m_want_more = ifelse(as.numeric(mv614) > total_child, 1, 0)) %>% 
+  mutate(mw_concord = ifelse(w_want_more == m_want_more, 1, 0)) %>% 
+  mutate(both_want = ifelse((w_want_more == 1 & m_want_more == 1), 1, 0)) %>% 
+  mutate(both_want_fac = factor(both_want, levels = c(0,1), labels = c("At least one partner does not want more children", "Both want more children")))
+
+df_couples %>% 
+  group_by(both_want_fac) %>% 
+  summarize(n = n()) %>% 
+  mutate(pct = round(n/sum(n)*100, 2)) %>% 
+  ggplot(aes(x = both_want_fac, y = pct)) +
+  geom_col(fill = "#7a6374") + 
+  geom_text(aes(label = pct), vjust = -0.5) +
+  expand_limits(y = c(0,100)) +
+  ylab("Percentage") +
+  xlab("") + 
+  theme_minimal()
+
+```
+
+## Stratification by: Number of living children
+
+```{r stratify by num child, echo = FALSE}
+df_couples <- df_couples %>% 
+  mutate(num_child = ifelse(as.numeric(total_child) > 4, 4, total_child)) %>% 
+  mutate(num_child = factor(num_child, levels = c(1:4), labels = c("One child", "Two children", "Three children", "Four or more children")))
+  
+df_couples %>% 
+  group_by(num_child) %>% 
+  summarize(n = n()) %>% 
+  mutate(pct = round(n/sum(n)*100, 2)) %>% 
+  ggplot(aes(x = num_child, y = pct)) +
+  geom_col(fill = "#7a6374") + 
+  geom_text(aes(label = pct), vjust = -0.5) +
+  expand_limits(y = c(0,100)) +
+  ylab("Percentage") +
+  xlab("") + 
+  theme_minimal()
+
+```
+
+## List of confounding variables 
+
+- Age of men and women (in years)
+- Educational attainment of men and women (in years)
+- Religion (Islam vs. others)
+- Wealth Index (Range: 0 to 100)
+- Place of residence (Rural vs. Urban)
+
+```{r covariates}
+## Education - Women
+df_couples$w_edu_yrs <- as.numeric(df_couples$v133)
+
+## Education - Men
+df_couples$m_edu_yrs <- as.numeric(df_couples$mv133)
+
+## Age of women
+df_couples$w_age <- df_couples$v012
+
+## Age of Men
+df_couples$m_age <- df_couples$mv012
+
+## Religion
+df_couples$islam <- ifelse(df_couples$v130 == "muslim", 1,0)
+
+## Wealth
+# create a wealth index score based on this sample
+df_couples$std_wealth_index = ((df_couples$v191 - min(df_couples$v191))/((max(df_couples$v191)-min(df_couples$v191)))*100)
+
+## Place of residence
+df_couples$urban <- df_couples$v025
+```
+
+
+```{r create datasets for stratified analysis}
+## Couples with less than 3 children
+df_couples_2 <- df_couples %>% 
+  filter(total_child < 3)
+
+## Couples with more than 2 children
+
+df_couples_3 <- df_couples %>% 
+  filter(total_child > 2)
+```
+
+# Mediation Analysis: couples with less than 3 children 
+
+## Step-1: Effect of more daughters (Exposure) on Contraception Use (Outcome)
+```{r Step-1,echo=TRUE}
+
+model_1a <- glmer(any_modern ~ more_daughters + w_edu_yrs + m_edu_yrs + w_age + m_age + 
+                  islam + std_wealth_index + urban + num_child + (1 | v001), data = df_couples_2, family = binomial("logit"))
+
+tidy(model_1a, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
+
+```
+
+## Step-2: Effect of more girls (Exposure) on Concordance between partners (mediator)
+
+```{r Step-2, echo=TRUE}
+model_1b <- glmer(both_want ~ more_daughters + (1 | v001), data = df_couples_2, family = "poisson")
+tidy(model_1b, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
+```
+
+## Step-3: Effect of Concordance between partners (mediator) on Contraception Use (outcome)
+
+```{r Step-3, echo=TRUE}
+model_1c <- glmer(any_modern ~ both_want + more_daughters + w_edu_yrs + m_edu_yrs + w_age + m_age + 
+                  islam + std_wealth_index + urban + num_child + (1 | v001), data = df_couples_2, family = binomial("logit"))
+tidy(model_1c, exponentiate = F, conf.int = T)[(1:3), c(3:4,8:9)]
+```
+
+
+## Using the mediation package
+```{r Mediation package, echo=TRUE}
+model_1_med <- mediate(model_1b,model_1c, treat = "more_daughters", mediator = "both_want", boot = TRUE, sims = 500)
+summary(model_1_med)
+```
+
+# Mediation Analysis: couples with 3 or more children
+
+## Step-1: Effect of more daughters (Exposure) on Contraception Use (Outcome)
+```{r More than 2 children: step-1, echo=TRUE}
+
+model_2a <- glmer(any_modern ~ more_daughters + w_edu_yrs + m_edu_yrs + w_age + m_age + 
+                  islam + std_wealth_index + urban + num_child + (1 | v001), data = df_couples_3, family = binomial("logit"))
+
+tidy(model_2a, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
+
+```
+
+## Step-2: Effect of more girls (Exposure) on Concordance between partners (mediator)
+
+```{r, echo=TRUE}
+model_2b <- glmer(both_want ~ more_daughters + (1 | v001), data = df_couples_3, family = binomial("logit"))
+tidy(model_2b, exponentiate = F, conf.int = T)[(1:2), c(3:4,8:9)]
+```
+
+## Step-3: Effect of Concordance between partners (mediator) on Contraception Use (outcome)
+
+```{r mediation for more than 2 children: step-3, echo=TRUE}
+model_2c <- glmer(any_modern ~ both_want + more_daughters + w_edu_yrs + m_edu_yrs + w_age + m_age + 
+                  islam + std_wealth_index + urban + num_child + (1 | v001) , data = df_couples_3, family = binomial("logit"))
+
+tidy(model_2c, exponentiate = F, conf.int = T)[(1:3), c(3:4,8:9)]
+```
+
+
+## Using the mediation package
+```{r, echo=TRUE}
+model_2_med <- mediate(model_2b,model_2c, treat = "more_daughters", mediator = "both_want", boot = TRUE, sims = 500)
+summary(model_2_med)
+```
+
+## Next steps / Questions
+
+* Results from Mediation package do not match our results from product method  
+* Undertake multi-level models
+* How should we deal with interaction between the Exposure and the Mediator?
+* When do we need sensitivity analysis?
+* How can we incorporate multinomial outcomes in mediation analysis
