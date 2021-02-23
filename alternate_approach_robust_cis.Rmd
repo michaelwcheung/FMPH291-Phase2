@@ -1,0 +1,36 @@
+
+```{r}
+model_1a_basic <- glm(as.numeric(any_modern) ~ more_daughters + num_child , data = df_couples_2, family = poisson)
+
+X <- model.matrix(model_1a_basic)
+
+# no. of observations
+n <- dim(X)[1]
+
+# num of predictors
+k <- dim(X)[2]
+
+# cluster name
+cluster <- "v001"
+
+# matrix for loops
+clus <- cbind(X,df_couples_2[,cluster],resid(model_1a_basic))
+colnames(clus)[(dim(clus)[2]-1):dim(clus)[2]] <- c(cluster,"resid")
+
+# number of clusters
+m <- dim(table(clus[,cluster]))
+
+# dof adjustment
+dfc <- (m/(m-1))*((n-1)/(n-k))
+
+# uj matrix
+uclust <- matrix(NA, nrow = m, ncol = k)
+gs <- names(table(df_couples_2[,cluster]))
+for(i in 1:m){
+   uclust[i,] <- (t(matrix(clus[clus[,cluster]==gs[i],k+2]))) %*% (clus[clus[,cluster]==gs[i],1:k])
+   }
+# square root of diagonal on bread meat bread like before
+se <- sqrt(diag(solve(crossprod(X)) %*% (t(uclust) %*% uclust) %*% solve(crossprod(X)))*dfc
+se
+```
+
