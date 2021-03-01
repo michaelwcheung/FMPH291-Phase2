@@ -1,0 +1,47 @@
+---
+title: "Reproducing Group-1's Findings"
+author: "Arnab Dey, Michael Cheung"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  slidy_presentation:
+    highlight: tango
+    slide_level: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r load-packages}
+library(tidyverse)
+library(stringr)
+library(summarytools)
+library(compareGroups)
+library(cobalt)
+```
+
+```{r load-dataset}
+df_master <- read.csv("group3_LATE_47215_3615162_DHS_shared-2.csv")
+```
+
+```{r filter cases}
+
+df_study <- df_master %>% 
+  filter(v044 == 1) %>%     # Cases selected for IPV module
+  filter(v502 == 1) %>%     # Drop cases that are not in union now
+  filter(str_sub(vcal_1,1,1) != 6) %>%  # Drop cases of sterilization
+  filter(v701 != 8) %>%     # Drop those who do not know spousal edu
+  filter(s116 != 8)      # Drop those who do not report caste
+  
+
+## Remove non-users
+df_study$any_digit <- grepl("[123456789]", df_study$vcal_1)
+df_study$any_valid_letter <- grepl("[ACEFLMNSW]", df_study$vcal_1)
+
+# variable for cases who use any method
+df_study$any_method <- ifelse(df_study$any_digit == TRUE | df_study$any_valid_letter == TRUE,1,0)
+
+# final dataset with valid cases
+df_study <- df_study %>% filter(any_method == 1)
+
+```
