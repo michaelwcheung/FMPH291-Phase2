@@ -28,11 +28,23 @@ df_master <- read.csv("group3_LATE_47215_3615162_DHS_shared-2.csv")
 df_study <- df_master %>% 
   filter(v044 == 1) %>%     # Cases selected for IPV module
   filter(v502 == 1) %>%     # Drop cases that are not in union now
-  filter(str_detect(vcal_1, "[123456789]") | str_detect(vcal_1, "[ACEFLMNSW]")) %>% # select only users of contraceptives
-  filter(str_sub(vcal_1,1,1) != 6) %>%  # Drop cases of sterilization
+  filter(str_detect(vcal_1, "[123456789ACEFLMNSW]")) %>% # select only users of contraceptives
+  filter(!str_detect(vcal_1, "[67]")) %>%  # Drop cases of sterilization
   filter(v701 != 8) %>%     # Drop those who do not know spousal edu
   filter(s116 != 8)      # Drop those who do not report caste
 
+```
+
+# Working on this
+
+```{r Outcome Variable}
+
+df_study <- df_study %>% 
+  mutate(any_use = ifelse(str_detect(vcal_1, "[123456789ACEFLMNSW]"), 1, 0)) %>% 
+  mutate(disc = ifelse(any_use == 1 & str_detect(vcal_1, "[0PTB.]"), 1, 0)) %>% 
+  select(vcal_1, any_use, disc)
+
+freq(df_study$disc)
 
 ```
 
