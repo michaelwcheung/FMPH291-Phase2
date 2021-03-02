@@ -43,8 +43,6 @@ df_study <- df_master %>%
 df_study <- df_study %>% 
   mutate(disc = ifelse(str_detect(vcal_1, "[0PTB][123456789ACEFLMNSW]"), 1, 0))
 
-freq(df_study$disc)
-
 ```
 
 ```{r exposure variable}
@@ -64,7 +62,55 @@ df_study$any_ipv <- df_study %>%
   mutate(total_ipv = rowSums(.)) %>% 
   mutate(any_ipv = ifelse(total_ipv > 0, 1, 0)) %>% 
   select(any_ipv)
-
-freq(df_study$any_ipv)
   
 ```
+
+
+```{r key-covariates}
+
+# Age
+df_study <- df_study %>% mutate(w_age = v012)
+
+# Education
+df_study <- df_study %>% 
+  mutate(w_edu = ifelse(v106 > 1, 2, v106)) %>% 
+  mutate(w_edu = factor(w_edu, levels = c(0,1,2), labels = c("No edu", "Primary", "Secondary or higher")))
+
+# Spousal Education
+df_study <- df_study %>% 
+  mutate(m_edu = ifelse(v701 > 1, 2, v701)) %>% 
+  mutate(m_edu = factor(m_edu, levels = c(0,1,2), labels = c("No edu", "Primary", "Secondary or higher")))
+
+# Wealth
+df_study <- df_study %>% mutate(wealth = v190) %>% 
+  mutate(wealth = factor(wealth, levels = c(1:5), labels = c("Poorest", "Poorer", 
+                                                             "Middle", "Richer", "Richest")))
+
+
+# Place of residence
+df_study <- df_study %>% mutate(residence = v025) %>% 
+  mutate(residence = factor(residence, levels = c(1,2), labels = c("Urban", "Rural")))
+
+
+# Num boys
+df_study <- df_study %>% mutate(tot_boys = v202 + v204) %>% 
+  mutate(boys_cat = ifelse(tot_boys > 1, 2, tot_boys)) %>% 
+  mutate(boys_cat = factor(boys_cat, levels = c(0:2), labels = c("Zero", "One", "Two+")))
+
+# Num daughters
+df_study <- df_study %>% mutate(tot_girls = v203 + v205) %>% 
+  mutate(girls_cat = ifelse(tot_girls > 1, 2, tot_girls)) %>% 
+  mutate(girls_cat = factor(girls_cat, levels = c(0:2), labels = c("Zero", "One", "Two+")))
+
+# Social Caste
+
+df_study <- df_study %>% mutate(caste = s116) %>% 
+  mutate(caste = factor(caste, levels = c(1:4), labels = c("SC", "ST", "OBC", "GEN")))
+
+
+# Religion
+df_study <- df_study %>% mutate(religion = ifelse(v130 > 2, 3, v130)) %>% 
+  mutate(religion = factor(religion, levels = c(1:3), labels = c("Hindu", "Muslim", "Other")))
+
+```
+
