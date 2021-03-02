@@ -35,16 +35,36 @@ df_study <- df_master %>%
 
 ```
 
-# Working on this
 
 ```{r Outcome Variable}
 
+# those who discontinued contraceptive
+
 df_study <- df_study %>% 
-  mutate(any_use = ifelse(str_detect(vcal_1, "[123456789ACEFLMNSW]"), 1, 0)) %>% 
-  mutate(disc = ifelse(any_use == 1 & str_detect(vcal_1, "[0PTB.]"), 1, 0)) %>% 
-  select(vcal_1, any_use, disc)
+  mutate(disc = ifelse(str_detect(vcal_1, "[0PTB][123456789ACEFLMNSW]"), 1, 0))
 
 freq(df_study$disc)
 
 ```
 
+```{r exposure variable}
+
+df_study$any_ipv <- df_study %>% 
+  mutate(n_d105a = ifelse(d105a == 1 | d105a == 2, 1, 0),
+         n_d105b = ifelse(d105b == 1 | d105b == 2, 1, 0),
+         n_d105c = ifelse(d105c == 1 | d105c == 2, 1, 0),
+         n_d105d = ifelse(d105d == 1 | d105d == 2, 1, 0),
+         n_d105e = ifelse(d105e == 1 | d105e == 2, 1, 0),
+         n_d105f = ifelse(d105f == 1 | d105f == 2, 1, 0),
+         n_d105h = ifelse(d105h == 1 | d105h == 2, 1, 0),
+         n_d105i = ifelse(d105i == 1 | d105i == 2, 1, 0),
+         n_d105j = ifelse(d105j == 1 | d105j == 2, 1, 0),
+         n_d105k = ifelse(d105k == 1 | d105k == 2, 1, 0)) %>% 
+  select(starts_with("n_")) %>% 
+  mutate(total_ipv = rowSums(.)) %>% 
+  mutate(any_ipv = ifelse(total_ipv > 0, 1, 0)) %>% 
+  select(any_ipv)
+
+freq(df_study$any_ipv)
+  
+```
