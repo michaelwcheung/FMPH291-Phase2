@@ -18,9 +18,11 @@ library(stringr)
 library(summarytools)
 library(compareGroups)
 library(cobalt)
+library(survey)
 ```
 
 ```{r load-dataset}
+setwd("~/Documents/FMPH291 Reproducibility/Data")
 df_master <- read.csv("group3_LATE_47215_3615162_DHS_shared-2.csv")
 ```
 
@@ -61,7 +63,9 @@ df_study$any_ipv <- df_study %>%
   select(starts_with("n_")) %>% 
   mutate(total_ipv = rowSums(.)) %>% 
   mutate(any_ipv = ifelse(total_ipv > 0, 1, 0)) %>% 
-  select(any_ipv)
+  select(any_ipv) %>%
+  as_vector() %>%
+  as_factor()
   
 ```
 
@@ -114,3 +118,183 @@ df_study <- df_study %>% mutate(religion = ifelse(v130 > 2, 3, v130)) %>%
 
 ```
 
+```{r survey weights, psu, strata}
+#weights
+df_study <- df_study %>%
+  mutate(weights = d005/(10^6)) %>%
+  dplyr::rename(psu = v021,
+                strata = v022)
+```
+
+```{r variable selection}
+outcome <- "disc"
+exposure <- "any_ipv"
+covariates <- c("w_age", "w_edu", "m_edu", "wealth", "residence", "boys_cat", "girls_cat", "caste", "religion")
+
+df_1 <- select(df_study, outcome, exposure, all_of(covariates), "weights", "psu", "strata")
+```
+
+```{r Table 1}
+#survey design
+design_wt <- svydesign(ids = df_1$psu,
+                       strata = df_1$strata,
+                       weights = df_1$weights,
+                       data = df_1)
+
+#table 1 structure
+table1_names <- c(exposure, all_of(covariates))
+
+
+tab1.1.cg <- compareGroups(~. - disc, data = select(df_1, all_of(table1_names), outcome))
+tab1.1 <- createTable(tab1.1.cg, show.n = F)
+tab1.2 <- update(tab1.1, x = update(tab1.1.cg, disc ~ .), show.p.overall = F)
+# table1 <- cbind("Total sample" = tab1.1, "Discontinued method in past 12 months" = tab1.2)
+
+export2csv(tab1.1, file = "phase2_tab1_1.csv")
+export2csv(tab1.2, file = "phase2_tab1_2.csv")
+
+tab1.1.df <- read.csv("phase2_tab1_1.csv")
+tab1.2.df <- read.csv("phase2_tab1_2.csv")
+
+table1 <- cbind(tab1.1.df, tab1.2.df[,2:3])
+names(table1) <- c("Covariates", "Total sample", "Did not discontinue contraceptives", "Discontinued contraceptives")
+
+write_csv(table1, "table1.csv")
+
+##edit weighted %s and weighted mean/SD for w_age - manually entered in table1.csv for now
+#outcome %s
+round(prop.table(svytable(~disc, design_wt, round = T)) * 100, 1)
+
+#any_ipv
+#not grouped
+round(prop.table(svytable(~any_ipv, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~any_ipv + disc, design_wt, round = T), 2) * 100, 1)
+
+#w_age
+#not grouped
+round(svymean(~w_age, design_wt)[1], 1)
+round(sqrt(svyvar(~w_age, design_wt)[1]), 2)
+#grouped
+round(svyby(~w_age, ~disc, design_wt, svymean)[,-3], 1)
+round(sqrt(svyby(~w_age, ~disc, design_wt, svyvar)[,-3]), 2)
+
+#w_edu
+#not grouped
+round(prop.table(svytable(~w_edu, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~w_edu + disc, design_wt, round = T), 2) * 100, 1)
+
+#m_edu
+#not grouped
+round(prop.table(svytable(~m_edu, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~m_edu + disc, design_wt, round = T), 2) * 100, 1)
+
+#wealth
+#not grouped
+round(prop.table(svytable(~wealth, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~wealth + disc, design_wt, round = T), 2) * 100, 1)
+
+#residence
+#not grouped
+round(prop.table(svytable(~residence, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~residence + disc, design_wt, round = T), 2) * 100, 1)
+
+#boys_cat
+#not grouped
+round(prop.table(svytable(~boys_cat, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~boys_cat + disc, design_wt, round = T), 2) * 100, 1)
+
+#girls_cat
+#not grouped
+round(prop.table(svytable(~girls_cat, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~girls_cat + disc, design_wt, round = T), 2) * 100, 1)
+
+#caste
+#not grouped
+round(prop.table(svytable(~caste, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~caste + disc, design_wt, round = T), 2) * 100, 1)
+
+#religion
+#not grouped
+round(prop.table(svytable(~religion, design_wt, round = T)) * 100, 1)
+#grouped
+round(prop.table(svytable(~religion + disc, design_wt, round = T), 2) * 100, 1)
+```
+
+## Table 1
+```{r, results='markup'}
+table1.final <- read.csv("table1.csv")
+table1
+```
+
+
+```{r Table 2}
+#table 1 structure
+tab2.cg <- compareGroups(any_ipv ~., data = select(df_1, all_of(covariates), exposure))
+tab2 <- createTable(tab2.cg, show.n = F)
+
+export2csv(tab2, file = "table2.csv", header.labels = c(p.overall = "p-value"))
+
+##edit weighted %s and weighted mean/SD for w_age - manually entered in table1.csv for now
+#exposure %s
+round(prop.table(svytable(~any_ipv, design_wt, round = T)) * 100, 1)
+
+#w_age
+round(svyby(~w_age, ~as.integer(any_ipv), design_wt, svymean)[,-3], 1)
+round(sqrt(svyby(~w_age, ~as.integer(any_ipv), design_wt, svyvar)[,-3]), 2)
+#t-test
+round(svyttest(w_age ~ any_ipv, design_wt)$p.value, 3)
+
+#w_edu
+round(prop.table(svytable(~w_edu + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~w_edu + any_ipv, design_wt)$p.value
+
+#m_edu
+round(prop.table(svytable(~m_edu + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~m_edu + any_ipv, design_wt)$p.value
+
+#wealth
+round(prop.table(svytable(~wealth + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~wealth + any_ipv, design_wt)$p.value
+
+#residence
+round(prop.table(svytable(~residence + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~residence + any_ipv, design_wt)$p.value
+
+#boys_cat
+round(prop.table(svytable(~boys_cat + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~boys_cat + any_ipv, design_wt)$p.value
+
+#girls_cat
+round(prop.table(svytable(~girls_cat + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~girls_cat + any_ipv, design_wt)$p.value
+
+#caste
+round(prop.table(svytable(~caste + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~caste + any_ipv, design_wt)$p.value
+
+#religion
+round(prop.table(svytable(~religion + any_ipv, design_wt, round = T), 2) * 100, 1)
+#pearson chi-square test
+svychisq(~religion + any_ipv, design_wt)$p.value
+```
+
+## Table 2
+```{r, results='markup'}
+table2.final <- read.csv("table2.csv")
+table2
+```
