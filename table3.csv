@@ -1,0 +1,27 @@
+"","Diff.Un","Diff.Adj"
+"w_age",-0.093,-0.042
+"w_edu_No edu",0.125,0.041
+"w_edu_Primary",0.052,0.016
+"w_edu_Secondary or higher",-0.176,-0.058
+"m_edu_No edu",0.072,0.023
+"m_edu_Primary",0.057,0.018
+"m_edu_Secondary or higher",-0.129,-0.041
+"wealth_Poorest",0.115,0.033
+"wealth_Poorer",0.077,0.024
+"wealth_Middle",0.012,0.014
+"wealth_Richer",-0.042,0.001
+"wealth_Richest",-0.162,-0.072
+"residence_Rural",0.08,0.03
+"boys_cat_Zero",-0.055,-0.019
+"boys_cat_One",-0.027,-0.009
+"boys_cat_Two+",0.082,0.028
+"girls_cat_Zero",-0.024,-0.008
+"girls_cat_One",-0.029,-0.011
+"girls_cat_Two+",0.054,0.019
+"caste_SC",0.063,0.024
+"caste_ST",0.018,0.005
+"caste_OBC",0.015,0.012
+"caste_GEN",-0.096,-0.041
+"religion_Hindu",0.012,0.002
+"religion_Muslim",-0.001,0.002
+"religion_Other",-0.012,-0.004

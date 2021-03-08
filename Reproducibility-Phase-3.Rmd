@@ -19,6 +19,7 @@ library(summarytools)
 library(compareGroups)
 library(cobalt)
 library(survey)
+library(WeightIt)
 ```
 
 ```{r load-dataset}
@@ -131,7 +132,7 @@ outcome <- "disc"
 exposure <- "any_ipv"
 covariates <- c("w_age", "w_edu", "m_edu", "wealth", "residence", "boys_cat", "girls_cat", "caste", "religion")
 
-df_1 <- select(df_study, outcome, exposure, all_of(covariates), "weights", "psu", "strata")
+df_1 <- select(df_study, all_of(outcome), all_of(exposure), all_of(covariates), "weights", "psu", "strata")
 ```
 
 ```{r Table 1}
@@ -145,21 +146,22 @@ design_wt <- svydesign(ids = df_1$psu,
 table1_names <- c(exposure, all_of(covariates))
 
 
-tab1.1.cg <- compareGroups(~. - disc, data = select(df_1, all_of(table1_names), outcome))
+tab1.1.cg <- compareGroups(~. - disc, data = select(df_1, all_of(table1_names), all_of(outcome)))
 tab1.1 <- createTable(tab1.1.cg, show.n = F)
 tab1.2 <- update(tab1.1, x = update(tab1.1.cg, disc ~ .), show.p.overall = F)
 # table1 <- cbind("Total sample" = tab1.1, "Discontinued method in past 12 months" = tab1.2)
 
-export2csv(tab1.1, file = "phase2_tab1_1.csv")
-export2csv(tab1.2, file = "phase2_tab1_2.csv")
-
-tab1.1.df <- read.csv("phase2_tab1_1.csv")
-tab1.2.df <- read.csv("phase2_tab1_2.csv")
-
-table1 <- cbind(tab1.1.df, tab1.2.df[,2:3])
-names(table1) <- c("Covariates", "Total sample", "Did not discontinue contraceptives", "Discontinued contraceptives")
-
-write_csv(table1, "table1.csv")
+#Export to csv; don't uncomment when knitting file
+# export2csv(tab1.1, file = "phase2_tab1_1.csv")
+# export2csv(tab1.2, file = "phase2_tab1_2.csv")
+# 
+# tab1.1.df <- read.csv("phase2_tab1_1.csv")
+# tab1.2.df <- read.csv("phase2_tab1_2.csv")
+# 
+# table1 <- cbind(tab1.1.df, tab1.2.df[,2:3])
+# names(table1) <- c("Covariates", "Total sample", "Did not discontinue contraceptives", "Discontinued contraceptives")
+# 
+# write_csv(table1, "table1.csv")
 
 ##edit weighted %s and weighted mean/SD for w_age - manually entered in table1.csv for now
 #outcome %s
@@ -297,4 +299,51 @@ svychisq(~religion + any_ipv, design_wt)$p.value
 ```{r, results='markup'}
 table2.final <- read.csv("table2.csv")
 table2
+```
+
+```{r Table 3}
+#propensity score
+PropScore <- predict(glm(any_ipv ~ w_age + w_edu + m_edu + wealth + residence + boys_cat + girls_cat + caste + religion,
+                         family = binomial,
+                         data = df_1),
+                     type = "response")
+
+#proportion exposed
+prop_exposed <- mean(as.integer(df_1$any_ipv) - 1)
+
+#create standardized weights 
+df_1 <- df_1 %>%
+  mutate(PS = PropScore,
+         weights = ifelse(any_ipv == 1, 
+                          prop_exposed/PS, 
+                          (1-prop_exposed)/(1-PS)))
+
+#truncate weights at 5th and 95th percentiles
+cutoff_5th <- quantile(df_1$weights, probs = .05)
+cutoff_95th <- quantile(df_1$weights, probs = .95)
+
+df_1 <- df_1 %>%
+  mutate(trunc_weights = case_when(weights < cutoff_5th ~ cutoff_5th,
+                                   weights > cutoff_95th ~ cutoff_95th,
+                                   weights >= cutoff_5th && weights <= cutoff_95th ~ weights))
+
+#Table 3 balance tests 
+table3.1 <- bal.tab(any_ipv ~ w_age + w_edu + m_edu + wealth + residence + boys_cat + girls_cat + caste + religion, 
+                    data = df_1)
+table3.2 <- bal.tab(any_ipv ~ w_age + w_edu + m_edu + wealth + residence + boys_cat + girls_cat + caste + religion,
+                    data = df_1, 
+                    weights = "trunc_weights")
+
+tab3.1 <- as.data.frame(table3.1$Balance)
+tab3.2 <- as.data.frame(table3.2$Balance)
+
+table3.final <- cbind(tab3.1,tab3.2)
+table3.final <- round(table3.final[,c(2,6)], 3)
+
+write.csv(table3.final, "table3.csv")
+```
+
+## Table 3
+```{r, results='markup'}
+table3.final
 ```
