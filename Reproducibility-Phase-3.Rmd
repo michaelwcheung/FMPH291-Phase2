@@ -132,10 +132,11 @@ outcome <- "disc"
 exposure <- "any_ipv"
 covariates <- c("w_age", "w_edu", "m_edu", "wealth", "residence", "boys_cat", "girls_cat", "caste", "religion")
 
-df_1 <- select(df_study, all_of(outcome), all_of(exposure), all_of(covariates), "weights", "psu", "strata")
+df_1 <- select(df_study, all_of(c(outcome, exposure, covariates)), "weights", "psu", "strata")
 ```
 
-```{r Table 1}
+```{r Table 1, results='hide'}
+options(survey.lonely.psu = "average")
 #survey design
 design_wt <- svydesign(ids = df_1$psu,
                        strata = df_1$strata,
@@ -143,10 +144,10 @@ design_wt <- svydesign(ids = df_1$psu,
                        data = df_1)
 
 #table 1 structure
-table1_names <- c(exposure, all_of(covariates))
+table1_names <- c(all_of(c(exposure, covariates)))
 
 
-tab1.1.cg <- compareGroups(~. - disc, data = select(df_1, all_of(table1_names), all_of(outcome)))
+tab1.1.cg <- compareGroups(~. - disc, data = select(df_1, all_of(c(table1_names, outcome))))
 tab1.1 <- createTable(tab1.1.cg, show.n = F)
 tab1.2 <- update(tab1.1, x = update(tab1.1.cg, disc ~ .), show.p.overall = F)
 # table1 <- cbind("Total sample" = tab1.1, "Discontinued method in past 12 months" = tab1.2)
@@ -233,16 +234,17 @@ round(prop.table(svytable(~religion + disc, design_wt, round = T), 2) * 100, 1)
 ## Table 1
 ```{r, results='markup'}
 table1.final <- read.csv("table1.csv")
-table1
+table1.final
 ```
 
 
-```{r Table 2}
+```{r Table 2, results='hide'}
 #table 1 structure
-tab2.cg <- compareGroups(any_ipv ~., data = select(df_1, all_of(covariates), exposure))
+tab2.cg <- compareGroups(any_ipv ~., data = select(df_1, all_of(c(covariates, exposure))))
 tab2 <- createTable(tab2.cg, show.n = F)
 
-export2csv(tab2, file = "table2.csv", header.labels = c(p.overall = "p-value"))
+#Export to csv; don't uncomment when knitting file
+# export2csv(tab2, file = "table2.csv", header.labels = c(p.overall = "p-value"))
 
 ##edit weighted %s and weighted mean/SD for w_age - manually entered in table1.csv for now
 #exposure %s
@@ -298,7 +300,7 @@ svychisq(~religion + any_ipv, design_wt)$p.value
 ## Table 2
 ```{r, results='markup'}
 table2.final <- read.csv("table2.csv")
-table2
+table2.final
 ```
 
 ```{r Table 3}
