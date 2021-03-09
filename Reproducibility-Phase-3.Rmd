@@ -124,7 +124,8 @@ df_study <- df_study %>% mutate(religion = ifelse(v130 > 2, 3, v130)) %>%
 df_study <- df_study %>%
   mutate(weights = d005/(10^6)) %>%
   dplyr::rename(psu = v021,
-                strata = v022)
+                strata = v022,
+                area_unit = v004)
 ```
 
 ```{r variable selection}
@@ -132,7 +133,7 @@ outcome <- "disc"
 exposure <- "any_ipv"
 covariates <- c("w_age", "w_edu", "m_edu", "wealth", "residence", "boys_cat", "girls_cat", "caste", "religion")
 
-df_1 <- select(df_study, all_of(c(outcome, exposure, covariates)), "weights", "psu", "strata")
+df_1 <- select(df_study, all_of(c(outcome, exposure, covariates)), "weights", "psu", "strata", "area_unit")
 ```
 
 ```{r Table 1, results='hide'}
@@ -316,18 +317,18 @@ prop_exposed <- mean(as.integer(df_1$any_ipv) - 1)
 #create standardized weights 
 df_1 <- df_1 %>%
   mutate(PS = PropScore,
-         weights = ifelse(any_ipv == 1, 
+         ps.weights = ifelse(any_ipv == 1, 
                           prop_exposed/PS, 
                           (1-prop_exposed)/(1-PS)))
 
 #truncate weights at 5th and 95th percentiles
-cutoff_5th <- quantile(df_1$weights, probs = .05)
-cutoff_95th <- quantile(df_1$weights, probs = .95)
+cutoff_5th <- quantile(df_1$ps.weights, probs = .05)
+cutoff_95th <- quantile(df_1$ps.weights, probs = .95)
 
 df_1 <- df_1 %>%
-  mutate(trunc_weights = case_when(weights < cutoff_5th ~ cutoff_5th,
-                                   weights > cutoff_95th ~ cutoff_95th,
-                                   weights >= cutoff_5th && weights <= cutoff_95th ~ weights))
+  mutate(trunc_weights = case_when(ps.weights < cutoff_5th ~ cutoff_5th,
+                                   ps.weights > cutoff_95th ~ cutoff_95th,
+                                   ps.weights >= cutoff_5th && ps.weights <= cutoff_95th ~ ps.weights))
 
 #Table 3 balance tests 
 table3.1 <- bal.tab(any_ipv ~ w_age + w_edu + m_edu + wealth + residence + boys_cat + girls_cat + caste + religion, 
